@@ -3,6 +3,7 @@ package me.siowu.OplusKeyHook;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.*;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 
@@ -18,9 +19,19 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        try {
+            // ✅ 初始化工具类
+            SPUtils.init(this);
+        } catch (SecurityException e) {
+            runOnUiThread(() -> {
+                Toast.makeText(
+                        MainActivity.this,
+                        "请先激活模块",
+                        Toast.LENGTH_LONG
+                ).show();
+            });
+        }
 
-        // ✅ 初始化工具类
-        SPUtils.init(this);
 
         spinnerType = findViewById(R.id.spinnerType);
         spinnerCommon = findViewById(R.id.spinnerCommon);
@@ -61,10 +72,14 @@ public class MainActivity extends AppCompatActivity {
 
         // 根据选择动态显示
         spinnerType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 updateLayout(position);
             }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
         });
 
         btnSave.setOnClickListener(v -> {
