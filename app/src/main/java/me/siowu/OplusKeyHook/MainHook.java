@@ -55,8 +55,8 @@ public class MainHook implements IXposedHookLoadPackage {
                                         XposedBridge.log("根据配置设定 不执行操作");
                                     }
                                 }
+                                param.setResult(null);
                             }
-
                         }
                     });
         } catch (Throwable t) {
