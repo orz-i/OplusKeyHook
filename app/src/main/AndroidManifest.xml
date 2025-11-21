@@ -27,7 +27,7 @@
             android:value="true" />
         <meta-data
             android:name="xposedscope"
-            android:value="android" />
+            android:resource="@array/xposed_scope" />
 
         <activity
             android:name=".MainActivity"

@@ -11,8 +11,8 @@ import me.siowu.OplusKeyHook.utils.SPUtils;
 public class MainActivity extends AppCompatActivity {
 
     private Spinner spinnerGesture, spinnerType, spinnerCommon;
-    private EditText editPackage, editActivity, editUrlScheme;
-    private LinearLayout layoutCommon, layoutCustomActivity, layoutUrlScheme;
+    private EditText editPackage, editActivity, editUrlScheme, editxiaobuShortcuts;
+    private LinearLayout layoutCommon, layoutCustomActivity, layoutUrlScheme, layoutxiaobuShortcuts;
     private Button btnSave;
     private CheckBox checkboxVibrate, checkboxExecuteWhenScreenOff;
 
@@ -39,9 +39,11 @@ public class MainActivity extends AppCompatActivity {
         editPackage = findViewById(R.id.editPackage);
         editActivity = findViewById(R.id.editActivity);
         editUrlScheme = findViewById(R.id.editUrlScheme);
+        editxiaobuShortcuts = findViewById(R.id.editxiaobuShortcuts);
         layoutCommon = findViewById(R.id.layoutCommon);
         layoutCustomActivity = findViewById(R.id.layoutCustomActivity);
         layoutUrlScheme = findViewById(R.id.layoutUrlScheme);
+        layoutxiaobuShortcuts = findViewById(R.id.layoutxiaobuShortcuts);
         checkboxVibrate = findViewById(R.id.checkboxVibrate);
         checkboxExecuteWhenScreenOff = findViewById(R.id.checkboxExecuteWhenScreenOff);
         btnSave = findViewById(R.id.btnSave);
@@ -57,14 +59,14 @@ public class MainActivity extends AppCompatActivity {
         // 类型选择
         ArrayAdapter<String> adapterType = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item,
-                new String[]{"无", "常用", "自定义Activity", "自定义UrlScheme"}
+                new String[]{"无", "常用功能", "执行小布快捷指令", "自定义Activity", "自定义UrlScheme"}
         );
         adapterType.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerType.setAdapter(adapterType);
 
         ArrayAdapter<String> adapterCommon = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item,
-                new String[]{"微信付款码", "微信扫一扫", "支付宝付款码", "支付宝扫一扫"}
+                new String[]{"微信付款码", "微信扫一扫", "支付宝付款码", "支付宝扫一扫", "一键闪记", "小布记忆"}
         );
         adapterCommon.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCommon.setAdapter(adapterCommon);
@@ -106,6 +108,7 @@ public class MainActivity extends AppCompatActivity {
         editPackage.setText(SPUtils.getString(prefix + "package", ""));
         editActivity.setText(SPUtils.getString(prefix + "activity", ""));
         editUrlScheme.setText(SPUtils.getString(prefix + "url", ""));
+        editxiaobuShortcuts.setText(SPUtils.getString(prefix + "xiaobu_shortcuts", ""));
 
         checkboxVibrate.setChecked(SPUtils.getBoolean(prefix + "vibrate", true));
         checkboxExecuteWhenScreenOff.setChecked(SPUtils.getBoolean(prefix + "screen_off", true));
@@ -122,6 +125,7 @@ public class MainActivity extends AppCompatActivity {
         SPUtils.putString(prefix + "package", editPackage.getText().toString().trim());
         SPUtils.putString(prefix + "activity", editActivity.getText().toString().trim());
         SPUtils.putString(prefix + "url", editUrlScheme.getText().toString().trim());
+        SPUtils.putString(prefix + "xiaobu_shortcuts", editxiaobuShortcuts.getText().toString().trim());
 
         SPUtils.putBoolean(prefix + "vibrate", checkboxVibrate.isChecked());
         SPUtils.putBoolean(prefix + "screen_off", checkboxExecuteWhenScreenOff.isChecked());
@@ -145,12 +149,16 @@ public class MainActivity extends AppCompatActivity {
         switch (type) {
             case "无":
                 return 0;
-            case "常用":
+            case "常用功能":
                 return 1;
-            case "自定义Activity":
+            case "执行小布快捷指令":
                 return 2;
-            case "自定义UrlScheme":
+            case "自定义Activity":
                 return 3;
+            case "自定义UrlScheme":
+                return 4;
+            case "自定义Shell命令":
+                return 5;
             default:
                 return 0;
         }
@@ -160,15 +168,19 @@ public class MainActivity extends AppCompatActivity {
         layoutCommon.setVisibility(View.GONE);
         layoutCustomActivity.setVisibility(View.GONE);
         layoutUrlScheme.setVisibility(View.GONE);
+        layoutxiaobuShortcuts.setVisibility(View.GONE);
 
         switch (pos) {
             case 1:
                 layoutCommon.setVisibility(View.VISIBLE);
                 break;
             case 2:
-                layoutCustomActivity.setVisibility(View.VISIBLE);
+                layoutxiaobuShortcuts.setVisibility(View.VISIBLE);
                 break;
             case 3:
+                layoutCustomActivity.setVisibility(View.VISIBLE);
+                break;
+            case 4:
                 layoutUrlScheme.setVisibility(View.VISIBLE);
                 break;
         }

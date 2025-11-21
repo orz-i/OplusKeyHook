@@ -22,7 +22,7 @@ public class KeyHook {
     private long lastUpTime = 0;
     private int clickCount = 0;
     private boolean isLongPress = false;
-    private static final long DOUBLE_CLICK_DELAY = 250;
+    private static final long DOUBLE_CLICK_DELAY = 300;
     private static final long LONG_PRESS_TIME = 495;
     private static Context systemContext;
 
@@ -37,7 +37,7 @@ public class KeyHook {
                     lpparam.classLoader
             );
 
-            if(clazz == null){
+            if (clazz == null) {
                 XposedBridge.log("[Hook] Error: StrategyActionButtonKeyLaunchApp class not found");
             }
 
@@ -125,31 +125,34 @@ public class KeyHook {
         sp.reload();
         if (interactive) {
             XposedBridge.log("当前屏幕是亮屏状态");
-            if (sp.getBoolean(prefix + "vibrate", true)) {
-                XposedHelpers.callMethod(currentStrategy, "longPressStartVibrate");
-            }
-            doAction(prefix);
+            doAction(prefix, currentStrategy);
         } else {
             XposedBridge.log("当前屏幕是息屏状态");
             if (sp.getBoolean(prefix + "screen_off", true)) {
                 XposedHelpers.callMethod(currentStrategy, "wakeup");
-                doAction(prefix);
+                doAction(prefix, currentStrategy);
             } else {
                 XposedBridge.log("根据配置设定 不执行操作");
             }
         }
     }
 
-    public void doAction(String prefix) {
+    public void doAction(String prefix, Object currentStrategy) {
         XposedBridge.log("开始执行快捷键操作");
         sp.reload();
+        if (sp.getBoolean(prefix + "vibrate", true)) {
+            XposedBridge.log("根据配置需要震动反馈");
+            XposedHelpers.callMethod(currentStrategy, "longPressStartVibrate");
+        } else {
+            XposedBridge.log("根据配置不需要震动反馈");
+        }
         String type = sp.getString(prefix + "type", "");
         XposedBridge.log("当前快捷键类型: " + type);
         switch (type) {
             case "无":
                 XposedBridge.log("不执行任何操作");
                 break;
-            case "常用":
+            case "常用功能":
                 doCommonAction(prefix);
                 break;
             case "自定义Activity":
@@ -158,12 +161,14 @@ public class KeyHook {
             case "自定义UrlScheme":
                 doCustomUrlScheme(prefix);
                 break;
+            case "执行小布快捷指令":
+                doXiaobuShortcuts(prefix);
+                break;
             default:
                 XposedBridge.log("未获取到配置");
                 break;
         }
     }
-
 
     public void doCommonAction(String prefix) {
         sp.reload();
@@ -181,6 +186,12 @@ public class KeyHook {
                 break;
             case 3:
                 startSchemeAsBrowser("alipays://platformapi/startapp?saId=10000007");
+                break;
+            case 4:
+                startFlashMemoryService();
+                break;
+            case 5:
+                startActivity("com.oplus.aimemory", "com.oplus.aimemory.MainActivity");
                 break;
         }
     }
@@ -205,6 +216,18 @@ public class KeyHook {
         }
         startSchemeAsBrowser(scheme);
     }
+
+    public void doXiaobuShortcuts(String prefix) {
+        sp.reload();
+        String scheme = sp.getString(prefix + "xiaobu_shortcuts", "");
+        if (scheme.isEmpty()) {
+            XposedBridge.log("小布快捷指令ID为空");
+            return;
+        }
+        XposedBridge.log("小布快捷指令ID: " + scheme);
+        executeXiaoBuShortcut(scheme, "");
+    }
+
 
     //启动自定义Activity
     private void startActivity(String pkgName, String targetActivity) {
@@ -292,4 +315,68 @@ public class KeyHook {
             return false;
         }
     }
+
+    public static void executeXiaoBuShortcut(String tag, String widgetCode) {
+
+        Context systemContext = (Context) XposedHelpers.callStaticMethod(
+                XposedHelpers.findClass("android.app.ActivityThread", null),
+                "currentApplication"
+        );
+        if (systemContext == null) {
+            XposedBridge.log("startWechatPayCode: systemContext == null");
+            return;
+        }
+        try {
+            Uri uri = Uri.parse("content://com.coloros.shortcuts.basecard.provider.FunctionSpecProvider");
+
+            Bundle params = new Bundle();
+            params.putString("tag", tag);
+            params.putString("widgetCode", widgetCode);
+
+            // method = execute_one_shortcut
+            Bundle result = systemContext.getContentResolver().call(
+                    uri,
+                    "execute_one_shortcut",
+                    null,
+                    params
+            );
+
+            Log.d("MyApp", "execute_one_shortcut result = " + result);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void startFlashMemoryService() {
+        try {
+            // 获取系统上下文
+            Context systemContext = (Context) XposedHelpers.callStaticMethod(
+                    XposedHelpers.findClass("android.app.ActivityThread", null),
+                    "currentApplication"
+            );
+
+            if (systemContext == null) {
+                XposedBridge.log("triggerFlashMemoryService: systemContext is null");
+                return;
+            }
+
+            // 构造Intent
+            Intent intent = new Intent();
+            intent.setPackage("com.coloros.colordirectservice");
+            intent.putExtra("triggerType", 1);
+            intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+
+            // 兼容低版本系统
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                systemContext.startForegroundService(intent);
+            } else {
+                systemContext.startService(intent);
+            }
+
+            XposedBridge.log("成功触发一键闪记服务");
+        } catch (Throwable t) {
+            XposedBridge.log("triggerFlashMemoryService error: " + t.getMessage());
+        }
+    }
+
 }

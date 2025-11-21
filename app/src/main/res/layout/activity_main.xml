@@ -109,13 +109,34 @@
                 android:hint="例如：weixin://" />
         </LinearLayout>
 
+        <!-- 自定义 URL Scheme -->
+        <LinearLayout
+            android:id="@+id/layoutxiaobuShortcuts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="小布快捷指令ID" />
+
+            <EditText
+                android:id="@+id/editxiaobuShortcuts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="抓取ID后，粘贴在这里" />
+        </LinearLayout>
+
         <CheckBox
             android:id="@+id/checkboxVibrate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:checked="true"
-            android:text="是否震动反馈（亮屏时）" />
+            android:text="是否震动反馈" />
 
         <CheckBox
             android:id="@+id/checkboxExecuteWhenScreenOff"
