@@ -23,6 +23,8 @@ public class KeyHook {
     private long lastUpTime = 0;
     private int clickCount = 0;
     private boolean isLongPress = false;
+    private boolean longPressHandled = false; // 标记长按是否已处理
+    private Thread longPressThread = null; // 保存长按检测线程引用，用于取消
     private static final long DOUBLE_CLICK_DELAY = 300;
     private static final long LONG_PRESS_TIME = 495;
     private static Context systemContext;
@@ -55,24 +57,52 @@ public class KeyHook {
                             Object currentStrategy = param.thisObject;
 
                             if (keyCode == 780) {
+                                // 检查是否有任何手势配置了功能
+                                sp.reload();
+                                boolean hasConfig = hasAnyGestureConfig();
+                                
+                                // 如果没有任何配置，放行让系统处理
+                                if (!hasConfig) {
+                                    XposedBridge.log("未检测到任何手势配置，放行系统处理");
+                                    return; // 不拦截，让系统继续处理
+                                }
+                                
                                 long now = System.currentTimeMillis();
+                                
                                 // 🔽=== 按下事件 ACTION_DOWN ===🔽
                                 if (event.getAction() == KeyEvent.ACTION_DOWN && down) {
                                     lastDownTime = now;
                                     isLongPress = false;
+                                    longPressHandled = false;
+                                    
+                                    // 取消之前可能存在的长按检测线程
+                                    if (longPressThread != null && longPressThread.isAlive()) {
+                                        longPressThread.interrupt();
+                                    }
+                                    
                                     // 启动一个判定长按的线程
-                                    new Thread(() -> {
+                                    longPressThread = new Thread(() -> {
                                         try {
                                             Thread.sleep(LONG_PRESS_TIME);
                                             // 若超过495ms仍未抬起，则判定为长按
-                                            if (lastUpTime < lastDownTime && !isLongPress) {
+                                            if (lastUpTime < lastDownTime && !isLongPress && !longPressHandled) {
                                                 isLongPress = true;
-                                                XposedBridge.log("触发长按事件");
-                                                handleClick("long_", interactive, currentStrategy);
+                                                longPressHandled = true;
+                                                // 检查长按是否有配置
+                                                if (hasGestureConfig("long_")) {
+                                                    XposedBridge.log("触发长按事件（按下超过495ms）");
+                                                    handleClick("long_", interactive, currentStrategy);
+                                                } else {
+                                                    XposedBridge.log("长按未配置，不执行操作");
+                                                }
                                             }
+                                        } catch (InterruptedException e) {
+                                            // 线程被中断，说明已经抬起，不处理长按
+                                            XposedBridge.log("长按检测线程被中断（已抬起）");
                                         } catch (Exception ignored) {
                                         }
-                                    }).start();
+                                    });
+                                    longPressThread.start();
 
                                     param.setResult(null);
                                     return;
@@ -80,30 +110,69 @@ public class KeyHook {
 
                                 // 🔼=== 抬起事件 ACTION_UP ===🔼
                                 if (event.getAction() == KeyEvent.ACTION_UP && !down) {
+                                    long pressDuration = now - lastDownTime;
                                     lastUpTime = now;
-                                    // 如果已被长按消耗，不处理短按和双击
-                                    if (isLongPress) {
+                                    
+                                    // 如果已经被长按处理，不处理短按和双击
+                                    if (longPressHandled) {
+                                        XposedBridge.log("长按已处理，忽略抬起事件");
                                         param.setResult(null);
                                         return;
                                     }
+                                    
+                                    // 中断长按检测线程（如果还在运行）
+                                    if (longPressThread != null && longPressThread.isAlive()) {
+                                        longPressThread.interrupt();
+                                    }
+                                    
+                                    // 如果按下时间超过长按阈值，判定为长按（在抬起时立即判断）
+                                    if (pressDuration >= LONG_PRESS_TIME) {
+                                        isLongPress = true;
+                                        longPressHandled = true;
+                                        // 检查长按是否有配置
+                                        if (hasGestureConfig("long_")) {
+                                            XposedBridge.log("触发长按事件（按下时间: " + pressDuration + "ms）");
+                                            handleClick("long_", interactive, currentStrategy);
+                                        } else {
+                                            XposedBridge.log("长按未配置，不执行操作");
+                                        }
+                                        param.setResult(null);
+                                        return;
+                                    }
+                                    
+                                    // 按下时间小于长按阈值，可能是短按或双击
                                     clickCount++;
 
                                     // 判断双击
                                     if (clickCount == 2 && (now - lastDownTime) < DOUBLE_CLICK_DELAY) {
-                                        XposedBridge.log("触发双击事件");
-                                        handleClick("double_", interactive, currentStrategy);
-                                        clickCount = 0;
-                                        param.setResult(null);
-                                        return;
+                                        // 检查双击是否有配置
+                                        if (hasGestureConfig("double_")) {
+                                            XposedBridge.log("触发双击事件");
+                                            handleClick("double_", interactive, currentStrategy);
+                                            clickCount = 0;
+                                            param.setResult(null);
+                                            return;
+                                        } else {
+                                            XposedBridge.log("双击未配置，不执行操作");
+                                            clickCount = 0;
+                                            param.setResult(null);
+                                            return;
+                                        }
                                     }
 
-                                    // 如果 250ms 内没有第二次点击，判定为短按
+                                    // 如果 300ms 内没有第二次点击，判定为短按
                                     new Thread(() -> {
                                         try {
                                             Thread.sleep(DOUBLE_CLICK_DELAY);
-                                            if (clickCount == 1 && !isLongPress) {
-                                                XposedBridge.log("触发短按事件");
-                                                handleClick("single_", interactive, currentStrategy);
+                                            // 再次检查，确保长按没有被处理，且确实是单次点击
+                                            if (clickCount == 1 && !longPressHandled && !isLongPress) {
+                                                // 检查短按是否有配置
+                                                if (hasGestureConfig("single_")) {
+                                                    XposedBridge.log("触发短按事件");
+                                                    handleClick("single_", interactive, currentStrategy);
+                                                } else {
+                                                    XposedBridge.log("短按未配置，不执行操作");
+                                                }
                                             }
                                             clickCount = 0;
                                         } catch (Exception ignored) {
@@ -124,35 +193,84 @@ public class KeyHook {
 
     public void handleClick(String prefix, boolean interactive, Object currentStrategy) {
         sp.reload();
+        String gestureName = getGestureName(prefix);
+        XposedBridge.log("检测到手势: " + gestureName + " (prefix: " + prefix + ")");
+        
         if (interactive) {
-            XposedBridge.log("当前屏幕是亮屏状态");
+            XposedBridge.log("当前屏幕是亮屏状态，执行 " + gestureName + " 操作");
             doAction(prefix, currentStrategy);
         } else {
             XposedBridge.log("当前屏幕是息屏状态");
             if (sp.getBoolean(prefix + "screen_off", true)) {
+                XposedBridge.log("根据配置，息屏状态下允许执行 " + gestureName + " 操作，唤醒屏幕");
                 XposedHelpers.callMethod(currentStrategy, "wakeup");
                 doAction(prefix, currentStrategy);
             } else {
-                XposedBridge.log("根据配置设定 不执行操作");
+                XposedBridge.log("根据配置设定，息屏状态下不执行 " + gestureName + " 操作");
             }
         }
     }
+    
+    private String getGestureName(String prefix) {
+        switch (prefix) {
+            case "single_":
+                return "短按";
+            case "double_":
+                return "双击";
+            case "long_":
+                return "长按";
+            default:
+                return prefix;
+        }
+    }
+    
+    /**
+     * 检查是否有任何手势配置了功能
+     * @return true 如果有至少一个手势配置了功能，false 如果都没有配置
+     */
+    private boolean hasAnyGestureConfig() {
+        sp.reload();
+        return hasGestureConfig("single_") || 
+               hasGestureConfig("double_") || 
+               hasGestureConfig("long_");
+    }
+    
+    /**
+     * 检查指定手势是否有有效配置
+     * @param prefix 手势前缀 (single_/double_/long_)
+     * @return true 如果有有效配置，false 如果未配置或配置为"无"
+     */
+    private boolean hasGestureConfig(String prefix) {
+        sp.reload();
+        String type = sp.getString(prefix + "type", "无");
+        // 如果类型为空、null 或"无"，则认为没有配置
+        return type != null && !type.isEmpty() && !"无".equals(type);
+    }
 
     public void doAction(String prefix, Object currentStrategy) {
-        XposedBridge.log("开始执行快捷键操作");
+        XposedBridge.log("开始执行快捷键操作，手势类型: " + prefix);
         sp.reload();
+        
+        // 震动反馈
         if (sp.getBoolean(prefix + "vibrate", true)) {
             XposedBridge.log("根据配置需要震动反馈");
             XposedHelpers.callMethod(currentStrategy, "longPressStartVibrate");
         } else {
             XposedBridge.log("根据配置不需要震动反馈");
         }
-        String type = sp.getString(prefix + "type", "");
-        XposedBridge.log("当前快捷键类型: " + type);
+        
+        // 读取配置的操作类型
+        String type = sp.getString(prefix + "type", "无");
+        XposedBridge.log("当前快捷键类型 [" + prefix + "]: " + type);
+        
+        // 如果未配置或设置为"无"，则不执行任何操作
+        if (type == null || type.isEmpty() || "无".equals(type)) {
+            XposedBridge.log("手势 [" + prefix + "] 未配置或设置为无操作");
+            return;
+        }
+        
+        // 根据配置类型执行相应操作
         switch (type) {
-            case "无":
-                XposedBridge.log("不执行任何操作");
-                break;
             case "常用功能":
                 doCommonAction(prefix);
                 break;
@@ -169,7 +287,7 @@ public class KeyHook {
                 doCustomShell(prefix);
                 break;
             default:
-                XposedBridge.log("未获取到配置");
+                XposedBridge.log("未知的快捷键类型 [" + prefix + "]: " + type);
                 break;
         }
     }

@@ -127,7 +127,9 @@ public class MainActivity extends AppCompatActivity {
     private void saveConfig() {
         int gesture = spinnerGesture.getSelectedItemPosition();
         String prefix = getPrefix(gesture);
+        String gestureName = getGestureName(gesture);
 
+        // 保存当前手势的所有配置
         SPUtils.putString(prefix + "type", (String) spinnerType.getSelectedItem());
         SPUtils.putInt(prefix + "common_index", spinnerCommon.getSelectedItemPosition());
         SPUtils.putString(prefix + "package", editPackage.getText().toString().trim());
@@ -139,7 +141,7 @@ public class MainActivity extends AppCompatActivity {
         SPUtils.putBoolean(prefix + "vibrate", checkboxVibrate.isChecked());
         SPUtils.putBoolean(prefix + "screen_off", checkboxExecuteWhenScreenOff.isChecked());
 
-        Toast.makeText(this, "已保存（3 秒后生效）", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, gestureName + " 配置已保存（3 秒后生效）", Toast.LENGTH_SHORT).show();
 
         String type = (String) spinnerType.getSelectedItem();
         if (type.equals("自定义Shell命令")) {
@@ -163,6 +165,18 @@ public class MainActivity extends AppCompatActivity {
                 return "long_";   // 长按
         }
         return "single_";
+    }
+    
+    private String getGestureName(int gesture) {
+        switch (gesture) {
+            case 0:
+                return "短按";
+            case 1:
+                return "双击";
+            case 2:
+                return "长按";
+        }
+        return "短按";
     }
 
     private int getTypeIndex(String type) {

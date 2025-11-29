@@ -21,6 +21,15 @@
             android:id="@+id/spinnerGesture"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:text="提示：可以为短按、双击、长按分别设置不同的功能，配置互不影响"
+            android:textSize="12sp"
+            android:textColor="#666666" />
 
         <TextView
             android:layout_width="wrap_content"
